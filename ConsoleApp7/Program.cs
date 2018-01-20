@@ -23,10 +23,11 @@ namespace ConsoleApp5
         static void Main(string[] args)
         {
             var startTimeSpan = TimeSpan.Zero;
-            var periodTimeSpan = TimeSpan.FromMinutes(250);
+            var periodTimeSpan = TimeSpan.FromMinutes(30);
 
             var timer = new System.Threading.Timer((e) =>
             {
+                
                 GlownaMetoda();
             }, null, startTimeSpan, periodTimeSpan);
 
@@ -46,13 +47,18 @@ namespace ConsoleApp5
 
         private static void GlownaMetoda()
         {
+            Wiadomosci = null;
+            Wiadomosci = new List<Wiadomosc>();
+            //System.GC.Collect();
+            //GC.WaitForPendingFinalizers();
             using (var client = new ImapClient())
             {
+                Console.WriteLine("Rozmiar listy: " + Wiadomosci.Count);
                 Console.WriteLine("Loguje sie.....");
-                client.Connect("server", 993, SecureSocketOptions.SslOnConnect);
+                client.Connect("imap.poczta.onet.pl", 993, SecureSocketOptions.SslOnConnect);
 
 
-                client.Authenticate("emai", "haslo");
+                client.Authenticate("fdsfdsf", "fdsfdsfdsf!");
                 var personalNamespace = client.PersonalNamespaces[0];
                 var emailFolders = client.GetFolders(personalNamespace);
 
@@ -65,23 +71,24 @@ namespace ConsoleApp5
                     int liczbaWiadomosci = folder.Count;
                     Console.WriteLine("Liczba plikow: " + client.GetFolder(folder.Name).Count);
                     //interesuja mnie tylko nieprzeczytane
-                    IList<MailKit.UniqueId> idNieprzeczytanychWiadomosci = client.GetFolder(folder.Name).Search(SearchQuery.NotSeen);
+                    IList<MailKit.UniqueId> idNieprzeczytanychWiadomosci = client.GetFolder(folder.Name).Search(SearchQuery.All);
                     if (idNieprzeczytanychWiadomosci.Count != 0)
                     {
-                        //wiadomosc to uid wiadomosci....
+                        //wiadomosc to 
                         foreach (var wiadomosc in idNieprzeczytanychWiadomosci)
                         {
                             
                             MimeMessage message = folder.GetMessage(wiadomosc);
-                            Console.WriteLine(message.TextBody);
+                           // Console.WriteLine(message.TextBody);
                             PobierzNadawceWiadomosci(message.From.Mailboxes);
                             PobierzDaneWiadomosci(nadawca, nadawcaMail, folder.GetMessage(wiadomosc).Subject,
-                                folder.GetMessage(wiadomosc).TextBody, folder.GetMessage(wiadomosc).HtmlBody);
+                            folder.GetMessage(wiadomosc).TextBody, folder.GetMessage(wiadomosc).HtmlBody);
+                            Console.WriteLine("Rozmiar listy: " + Wiadomosci.Count);
                             //po przetworzeniu oznaczyc jako przeczytany
                             folder.SetFlags(wiadomosc, MessageFlags.Seen, true);
 
-                            if(folder.GetMessage(wiadomosc).Attachments.Count() > 0)
-                            PobierzZalaczniki(client, idNieprzeczytanychWiadomosci, client.GetFolder(folder.Name));
+                           // if(folder.GetMessage(wiadomosc).Attachments.Count() > 0)
+                           // PobierzZalaczniki(client, idNieprzeczytanychWiadomosci, client.GetFolder(folder.Name));
 
 
 
@@ -91,6 +98,7 @@ namespace ConsoleApp5
                 }
              
                 Console.WriteLine("Wylogowany....");
+                
             }
         }
 
@@ -107,8 +115,8 @@ namespace ConsoleApp5
             {
                 nadawca = mailbox.Name;
                 nadawcaMail = mailbox.Address;
-                Console.WriteLine(mailbox.Name);
-                Console.WriteLine(mailbox.Address);
+              //  Console.WriteLine(mailbox.Name);
+               // Console.WriteLine(mailbox.Address);
             }
 
         }
@@ -130,12 +138,10 @@ namespace ConsoleApp5
                 {
                     // octects rozmiar pliku w bajtach
                     var size = attachment.Octets;
-                    Console.WriteLine("Rozmiar zalacznika w bytach: " + size.ToString());
-                    Console.WriteLine("Nazwa pliku: " + attachment.FileName);
+                    //Console.WriteLine("Rozmiar zalacznika w bytach: " + size.ToString());
+                 //   Console.WriteLine("Nazwa pliku: " + attachment.FileName);
                     // pobieranie zalacznika
                     var entity = folder.GetBodyPart(item.UniqueId, attachment);
-
-                   
                     using (var stream = File.Create(Path.Combine(sciezka.FullName, Directory.CreateDirectory(sciezka.FullName + "\\" + nadawca).FullName.Trim(' '), attachment.FileName)))
                     {
                         if (entity is MessagePart)
