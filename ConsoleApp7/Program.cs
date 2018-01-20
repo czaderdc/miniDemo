@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Entity;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
+using ConsoleApp7;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
@@ -16,7 +18,7 @@ namespace ConsoleApp5
 {
     class Program
     {
-        static List<Wiadomosc> Wiadomosci = new List<Wiadomosc>();
+        static List<WiadomoscTemp> WiadomoscTempi = new List<WiadomoscTemp>();
         static string nadawca = "";
         static string nadawcaMail = "";
         static DirectoryInfo sciezka = Directory.CreateDirectory("C:\\folderPlikiMaile");
@@ -47,68 +49,81 @@ namespace ConsoleApp5
 
         private static void GlownaMetoda()
         {
-            Wiadomosci = null;
-            Wiadomosci = new List<Wiadomosc>();
+           // WiadomoscTempi = null;
+          //  WiadomoscTempi = new List<WiadomoscTemp>();
             //System.GC.Collect();
             //GC.WaitForPendingFinalizers();
-            using (var client = new ImapClient())
+            using (var context = new ConsoleApp7.MyDBContext())
             {
-                Console.WriteLine("Rozmiar listy: " + Wiadomosci.Count);
-                Console.WriteLine("Loguje sie.....");
-                client.Connect("imap.poczta.onet.pl", 993, SecureSocketOptions.SslOnConnect);
+                using (var client = new ImapClient())
+                {
+                    Console.WriteLine("Rozmiar listy: " + WiadomoscTempi.Count);
+                    Console.WriteLine("Loguje sie.....");
+                    client.Connect("imap.poczta.onet.pl", 993, SecureSocketOptions.SslOnConnect);
 
 
-                client.Authenticate("fdsfdsf", "fdsfdsfdsf!");
-                var personalNamespace = client.PersonalNamespaces[0];
-                var emailFolders = client.GetFolders(personalNamespace);
+                    client.Authenticate("konrad521@vp.pl", "Chedozycto3!!");
+                    var personalNamespace = client.PersonalNamespaces[0];
+                    var emailFolders = client.GetFolders(personalNamespace);
 
-                foreach (var folder in emailFolders)
-                {//readwrite, bo musze oznaczyc jako otwarte przetworzone juz pliki
-                  
-                   var readingFolder = client.GetFolder(folder.Name).Open(FolderAccess.ReadWrite);
-                    Console.WriteLine("Nazwa folderu: " + folder.Name);
-                    int liczbaNieprzeczytanych = folder.Unread;
-                    int liczbaWiadomosci = folder.Count;
-                    Console.WriteLine("Liczba plikow: " + client.GetFolder(folder.Name).Count);
-                    //interesuja mnie tylko nieprzeczytane
-                    IList<MailKit.UniqueId> idNieprzeczytanychWiadomosci = client.GetFolder(folder.Name).Search(SearchQuery.All);
-                    if (idNieprzeczytanychWiadomosci.Count != 0)
-                    {
-                        //wiadomosc to 
-                        foreach (var wiadomosc in idNieprzeczytanychWiadomosci)
+                    foreach (var folder in emailFolders)
+                    {//readwrite, bo musze oznaczyc jako otwarte przetworzone juz pliki
+
+                        var readingFolder = client.GetFolder(folder.Name).Open(FolderAccess.ReadWrite);
+                        Console.WriteLine("Nazwa folderu: " + folder.Name);
+                        int liczbaNieprzeczytanych = folder.Unread;
+                        int liczbaWiadomoscTempi = folder.Count;
+                        Console.WriteLine("Liczba plikow: " + client.GetFolder(folder.Name).Count);
+                        //interesuja mnie tylko nieprzeczytane
+                        IList<MailKit.UniqueId> idNieprzeczytanychWiadomoscTempi = client.GetFolder(folder.Name).Search(SearchQuery.All);
+                        if (idNieprzeczytanychWiadomoscTempi.Count != 0)
                         {
-                            
-                            MimeMessage message = folder.GetMessage(wiadomosc);
-                           // Console.WriteLine(message.TextBody);
-                            PobierzNadawceWiadomosci(message.From.Mailboxes);
-                            PobierzDaneWiadomosci(nadawca, nadawcaMail, folder.GetMessage(wiadomosc).Subject,
-                            folder.GetMessage(wiadomosc).TextBody, folder.GetMessage(wiadomosc).HtmlBody);
-                            Console.WriteLine("Rozmiar listy: " + Wiadomosci.Count);
-                            //po przetworzeniu oznaczyc jako przeczytany
-                            folder.SetFlags(wiadomosc, MessageFlags.Seen, true);
+                            //WiadomoscTemp to 
+                            foreach (var WiadomoscTemp in idNieprzeczytanychWiadomoscTempi)
+                            {
 
-                           // if(folder.GetMessage(wiadomosc).Attachments.Count() > 0)
-                           // PobierzZalaczniki(client, idNieprzeczytanychWiadomosci, client.GetFolder(folder.Name));
+                                MimeMessage message = folder.GetMessage(WiadomoscTemp);
+                                if (SprawdzCzyJestWBazie(context, message.MessageId))
+                                    continue;
+                                // Console.WriteLine(message.TextBody);
+                                PobierzNadawceWiadomoscTempi(message.From.Mailboxes);
+                                //PobierzDaneWiadomoscTempi(nadawca, nadawcaMail, folder.GetMessage(WiadomoscTemp).Subject,
+                                //folder.GetMessage(WiadomoscTemp).TextBody, folder.GetMessage(WiadomoscTemp).HtmlBody);
+                                Wiadomosc wiadomosc = new Wiadomosc();
+                                wiadomosc.MailNadawcy = nadawcaMail;
+                                wiadomosc.Nadawca = nadawca;
+                                wiadomosc.TrescWiadomoscTempiHTML = folder.GetMessage(WiadomoscTemp).HtmlBody;
+                                wiadomosc.Temat = folder.GetMessage(WiadomoscTemp).Subject;
+                                wiadomosc.MessageID = message.MessageId;
+                                context.Wiadomosci.Add(wiadomosc);
+                                context.SaveChanges();
+                                Console.WriteLine("Rozmiar listy: " + WiadomoscTempi.Count);
+                                //po przetworzeniu oznaczyc jako przeczytany
+                                folder.SetFlags(WiadomoscTemp, MessageFlags.Seen, true);
 
+                                // if(folder.GetMessage(WiadomoscTemp).Attachments.Count() > 0)
+                                // PobierzZalaczniki(client, idNieprzeczytanychWiadomoscTempi, client.GetFolder(folder.Name));
 
+                              
+
+                            }
 
                         }
-                        
                     }
                 }
-             
+
                 Console.WriteLine("Wylogowany....");
-                
+
             }
         }
 
-        private static void PobierzDaneWiadomosci(string nazwaNadawcy, string mailNadawcy, string tematWiadomosci, string trescWiadomosci, string trescHTML)
+        private static void PobierzDaneWiadomoscTempi(string nazwaNadawcy, string mailNadawcy, string tematWiadomoscTempi, string trescWiadomoscTempi, string trescHTML)
         {
-            Wiadomosc nowa = new Wiadomosc(nazwaNadawcy, mailNadawcy, tematWiadomosci, trescWiadomosci, trescHTML);
-            Wiadomosci.Add(nowa);
+            WiadomoscTemp nowa = new WiadomoscTemp(nazwaNadawcy, mailNadawcy, tematWiadomoscTempi, trescWiadomoscTempi, trescHTML);
+            WiadomoscTempi.Add(nowa);
         }
 
-        private static void PobierzNadawceWiadomosci(IEnumerable<MailboxAddress> adres)
+        private static void PobierzNadawceWiadomoscTempi(IEnumerable<MailboxAddress> adres)
         {
 
             foreach (var mailbox in adres)
@@ -122,7 +137,18 @@ namespace ConsoleApp5
         }
 
 
+        private static bool SprawdzCzyJestWBazie(MyDBContext context, string MessageID)
+        {
+            var query = context.Wiadomosci.Where(w => w.MessageID == MessageID).Count();
+            if(query > 0 )
+            {
+                Console.WriteLine("Ta wiadomosc jest juz zapisana w bazie!");
+                return true;
+            }
 
+            return false;
+
+        }
     
 
         private static void PobierzZalaczniki(ImapClient client, IList<MailKit.UniqueId> ids, IMailFolder folder)

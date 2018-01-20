@@ -4,24 +4,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ConsoleApp5
+namespace ConsoleApp7
 {
-    internal class Wiadomosc
+    public class Wiadomosc
     {
-
-        public Wiadomosc(string nadawca, string mailnadawcy, string temat, string tresctekst, string treschtml)
-        {
-            Nadawca = nadawca;
-            MailNadawcy = mailnadawcy;
-            Temat = temat;
-            TrescWiadomosciTekst = tresctekst;
-            TrescWiadomosciHTML = treschtml;
-        }
-
+        public int WiadomoscID { get; set; }
+        public string MessageID { get; set; }
         public string Nadawca { get; set; }
         public string MailNadawcy { get; set; }
         public string Temat { get; set; }
-        public string TrescWiadomosciTekst { get; set; }
-        public string TrescWiadomosciHTML { get; set; }
+        public string TrescWiadomoscTempiTekst { get; set; }
+        public string TrescWiadomoscTempiHTML { get; set; }
     }
 }
