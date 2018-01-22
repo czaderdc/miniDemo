@@ -35,12 +35,18 @@ namespace ConsoleApp5
         {
             var startTimeSpan = TimeSpan.Zero;
             var periodTimeSpan = TimeSpan.FromMinutes(30);
+            try
+            {
+                var timer = new System.Threading.Timer(async (e) =>
+                {
 
-            var timer = new System.Threading.Timer((e) =>
+                    await GlownaMetoda();
+                }, null, startTimeSpan, periodTimeSpan);
+            }
+            catch(Exception ex)
             {
 
-                GlownaMetoda();
-            }, null, startTimeSpan, periodTimeSpan);
+            }
 
 
 
@@ -56,7 +62,7 @@ namespace ConsoleApp5
 
         }
 
-        private static void GlownaMetoda()
+        private static async Task GlownaMetoda()
         {
             // WiadomoscTempi = null;
             //  WiadomoscTempi = new List<WiadomoscTemp>();
@@ -71,7 +77,7 @@ namespace ConsoleApp5
             Console.WriteLine("Typ klienta: " + user.ClientType);
             using (var context = new ConsoleApp7.MyDBContext())
             {
-
+                
                 if (user.ClientType == ClientType.IMAP)
                 {
                     Console.WriteLine("Lacze sie przez IMAP :D:D:D");
@@ -81,7 +87,7 @@ namespace ConsoleApp5
                         Console.WriteLine("Loguje sie.....");
                         try
                         {
-                            client.Connect("pop3.poczta.onet.pl", 995, SecureSocketOptions.SslOnConnect);
+                            await client.ConnectAsync("imap.poczta.onet.pl", 993, SecureSocketOptions.SslOnConnect);
                         }
                         catch (Exception ex)
                         {
@@ -90,14 +96,14 @@ namespace ConsoleApp5
 
                         try
                         {
-                            client.Authenticate("konrad521@vp.pl", "Chedodsa!");
+                            await client.AuthenticateAsync("konrad521@vp.pl", "Chedozycto3!!");
                         }
                         catch (Exception ex)
                         {
 
                         }
                         var personalNamespace = client.PersonalNamespaces[0];
-                        var emailFolders = GetBoxFolerList(client, personalNamespace);
+                        var emailFolders = await GetBoxFolerList(client, personalNamespace);
 
                         foreach (var folder in emailFolders)
                         {//readwrite, bo musze oznaczyc jako otwarte przetworzone juz pliki
@@ -114,8 +120,8 @@ namespace ConsoleApp5
                                 //WiadomoscTemp to 
                                 foreach (var WiadomoscTemp in idNieprzeczytanychWiadomoscTempi)
                                 {
-
-                                    MimeMessage message = folder.GetMessage(WiadomoscTemp);
+                                    var zad = await Task.Run(() => folder.GetMessageAsync(WiadomoscTemp));
+                                    MimeMessage message = zad;
                                     if (SprawdzCzyJestWBazie(context, message.MessageId))
                                         continue;
                                     // Console.WriteLine(message.TextBody);
@@ -129,8 +135,16 @@ namespace ConsoleApp5
                                     wiadomosc.Temat = folder.GetMessage(WiadomoscTemp).Subject;
                                     wiadomosc.MessageID = message.MessageId;
                                     context.Wiadomosci.Add(wiadomosc);
-                                    context.SaveChanges();
-                                    Console.WriteLine("Rozmiar listy: " + WiadomoscTempi.Count);
+                                    try
+                                    {
+                                      
+                                        int n =  await context.SaveChangesAsync();
+                                        Console.WriteLine("Rozmiar listy: " + WiadomoscTempi.Count);
+                                    }
+                                    catch(Exception ex)
+                                    {
+
+                                    }
                                     //po przetworzeniu oznaczyc jako przeczytany
                                     folder.SetFlags(WiadomoscTemp, MessageFlags.Seen, true);
 
@@ -159,20 +173,23 @@ namespace ConsoleApp5
         }
 
 
-        private static void PobierzDaneWiadomoscTempi(string nazwaNadawcy, string mailNadawcy, string tematWiadomoscTempi, string trescWiadomoscTempi, string trescHTML)
+        private static async Task PobierzDaneWiadomoscTempi(string nazwaNadawcy, string mailNadawcy, string tematWiadomoscTempi, string trescWiadomoscTempi, string trescHTML)
         {
             WiadomoscTemp nowa = new WiadomoscTemp(nazwaNadawcy, mailNadawcy, tematWiadomoscTempi, trescWiadomoscTempi, trescHTML);
-            WiadomoscTempi.Add(nowa);
+            await Task.Run(() => WiadomoscTempi.Add(nowa));
         }
 
-        private static List<IMailFolder> GetBoxFolerList(ImapClient client, FolderNamespace folderNamespace)
+        private static async Task<List<IMailFolder>> GetBoxFolerList(ImapClient client, FolderNamespace folderNamespace)
         {
-            return client.GetFolders(folderNamespace).ToList();
+            var list = await client.GetFoldersAsync(folderNamespace);
+            return list.ToList();
         }
 
-        private static List<UniqueId> GetIdsOfUnreadMessages(ImapClient client, IMailFolder folderName)
+        private static async Task<List<UniqueId>> GetIdsOfUnreadMessages(ImapClient client, IMailFolder folderName)
         {
-            return client.GetFolder(folderName.Name).Search(SearchQuery.NotSeen).ToList();
+            var ids = await (client.GetFolder(folderName.Name).SearchAsync(SearchQuery.NotSeen));
+            return ids.ToList();
+
         }
 
         private static void PobierzNadawceWiadomoscTempi(IEnumerable<MailboxAddress> adres)
@@ -203,10 +220,10 @@ namespace ConsoleApp5
         }
 
 
-        private static void PobierzZalaczniki(ImapClient client, IList<MailKit.UniqueId> ids, IMailFolder folder)
+        private static async Task PobierzZalaczniki(ImapClient client, IList<MailKit.UniqueId> ids, IMailFolder folder)
         {
 
-            var items = folder.Fetch(ids, MessageSummaryItems.BodyStructure | MessageSummaryItems.UniqueId);
+            var items = await folder.FetchAsync(ids, MessageSummaryItems.BodyStructure | MessageSummaryItems.UniqueId);
 
             foreach (var item in items)
             {
@@ -219,20 +236,20 @@ namespace ConsoleApp5
                     //Console.WriteLine("Rozmiar zalacznika w bytach: " + size.ToString());
                     //   Console.WriteLine("Nazwa pliku: " + attachment.FileName);
                     // pobieranie zalacznika
-                    var entity = folder.GetBodyPart(item.UniqueId, attachment);
+                    var entity = await folder.GetBodyPartAsync(item.UniqueId, attachment);
                     using (var stream = File.Create(Path.Combine(sciezka.FullName, Directory.CreateDirectory(sciezka.FullName + "\\" + nadawca).FullName.Trim(' '), attachment.FileName)))
                     {
                         if (entity is MessagePart)
                         {
                             var part = (MessagePart)entity;
 
-                            part.Message.WriteTo(stream);
+                            await part.Message.WriteToAsync(stream);
                         }
                         else
                         {
                             var part = (MimePart)entity;
 
-                            part.Content.DecodeTo(stream);
+                            await part.Content.DecodeToAsync(stream);
                         }
                     }
                 }
